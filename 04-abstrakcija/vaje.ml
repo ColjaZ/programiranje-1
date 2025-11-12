@@ -20,9 +20,12 @@ module type NAT = sig
 
   val eq  : t -> t -> bool
   val zero : t
-  (* Dodajte manjkajoče! *)
-  (* val to_int : t -> int *)
-  (* val of_int : int -> t *)
+  val one : t
+  val ( + ) : t -> t -> t
+  val ( - ) : t -> t -> t
+  val ( * ) : t -> t -> t
+  val to_int : t -> int
+  val of_int : int -> t
 end
 
 (*----------------------------------------------------------------------------*
@@ -36,9 +39,16 @@ end
 module Nat_int : NAT = struct
 
   type t = int
-  let eq x y = failwith "later"
+  let eq x y = (x = y)
   let zero = 0
-  (* Dodajte manjkajoče! *)
+  let one = 1
+
+  let ( + ) a b = a + b
+  let ( * ) a b = a * b
+  let ( - ) a b = if a < b then 0 else a - b
+
+  let to_int n = n
+  let of_int n = n
 
 end
 
@@ -53,25 +63,63 @@ end
 
 module Nat_peano : NAT = struct
 
-  type t = unit (* To morate spremeniti! *)
-  let eq x y = failwith "later"
-  let zero = () (* To morate spremeniti! *)
-  (* Dodajte manjkajoče! *)
+  type t = 
+    | Nic 
+    | Nasl of t
 
+  let rec eq x y = 
+    match (x, y) with 
+      | Nic, Nic -> true
+      | Nic, _ -> false
+      | _, Nic -> false
+      | Nasl x', Nasl y' -> eq x' y'
+
+  let zero = Nic
+  let one = Nasl Nic
+
+  let rec ( + ) x y = 
+    match x with
+      | Nic -> y
+      | Nasl x' -> Nasl (x' + y)
+
+  let rec ( * ) x y =
+    match x with
+      | Nic -> Nic
+      | Nasl x' -> (x' * y) + y
+
+  let rec ( - ) x y =
+    match (x, y) with
+    | Nic, _ -> Nic
+    | x, Nic -> x
+    | Nasl x', Nasl y' -> x' - y'
+
+  let rec to_int x = 
+    match x with
+      | Nic -> 0
+      | Nasl x' -> Int. add 1 (to_int x')
+
+  let rec of_int x =
+    match x with
+      | 0 -> Nic
+      | x -> Nasl (of_int (Int.sub x 1))
+    
 end
 
+let pet = Nat_peano.of_int 5
+let deset = Nat_peano.of_int 10
+let petnajst = Nat_peano.( + ) pet deset
 (*----------------------------------------------------------------------------*
  Ocaml omogoča sestavljanje modulov iz drugih modulov z uporabo [funktorjev]
- (https://ocaml.org/docs/functors). 
+ (https://ocaml.org/docs/functors).
  Funktor je tako preslikava med moduli, zapišemo jo v obliki modula, ki kot
  argumente sprejme druge module. Tako uporabi zapis naslednjo strukturo
  `module Ime_funktorja (Ime_modula : SIG1) : SIG2 = struct ... end`.
 
- Modul za računanje z naravnimi števili ima signaturo `CALC` (vanjo lahko 
- dodate še kakšne funkcije). Module s to signaturo bomo zgradili z uporabo 
- funktorja `Nat_calculations`, ki sprejme argument modula s signaturo `NAT` 
- in računal z operacijami, ki jih ima ta signatura. 
- Napišite funkciji fakultete in vsote prvih 100 naravnih števil, ki jih signatura 
+ Modul za računanje z naravnimi števili ima signaturo `CALC` (vanjo lahko
+ dodate še kakšne funkcije). Module s to signaturo bomo zgradili z uporabo
+ funktorja `Nat_calculations`, ki sprejme argument modula s signaturo `NAT`
+ in računal z operacijami, ki jih ima ta signatura.
+ Napišite funkciji fakultete in vsote prvih 100 naravnih števil, ki jih signatura
  `CALC` zahteva.
 [*----------------------------------------------------------------------------*)
 module type CALC = sig
@@ -82,11 +130,16 @@ module type CALC = sig
 end
 
 module Nat_calculations (N: NAT) : CALC with type t := N.t = struct
-  let factorial _ = (* To morate spremeniti! *)
-    N.zero
+  let rec factorial n = 
+    if (N.eq n N.zero) then N.one
+    else N.( * ) n (factorial (N.(-) n N.one))
 
-  let sum_100 = (* To morate spremeniti! *)
-    N.zero
+  let sum_100 = 
+    let rec aux n acc =
+      if (N.eq n N.zero) then N.zero
+      else aux (N.( - ) n N.one) (N.( + ) acc n)
+    in
+    aux (N.of_int 100) N.zero
 end
 
 (*----------------------------------------------------------------------------*
@@ -100,7 +153,8 @@ end
 module Nat_int_calc = Nat_calculations (Nat_int)
 module Nat_peano_calc = Nat_calculations (Nat_peano)
 
-
+let sum_100_int =
+  Nat_int_calc.sum_100 |> Nat_int.to_int
 (* val sum_100_int : int = 5050 *)
 (* val sum_100_peano : int = 5050 *)
 (* val fact_5_int : int = 120 *)
@@ -109,9 +163,9 @@ module Nat_peano_calc = Nat_calculations (Nat_peano)
 (*----------------------------------------------------------------------------*
  Funktor lahko sprejme tudi več modulov, njegova končna signatura pa je poljubna,
  torej je lahko enaka signaturi modulov, ki ju sprejme kot argumenta.
- 
+
  Napišite funktor `Nat_pair`, ki sprejme dva modula s signaturo `NAT` in vrne
- modul s signaturo `NAT`. Osnovni tip definiranega modula naj bo par števil 
+ modul s signaturo `NAT`. Osnovni tip definiranega modula naj bo par števil
  tipov modulov iz argumentov. Računske operacije naj delujejo po komponentah.
  Pretvorjanje iz in v `int` pa definirajte poljubno.
 [*----------------------------------------------------------------------------*)
