@@ -657,27 +657,33 @@ let primer_regex_6 = List.filter (nfa_sprejema (znak_nfa '0')) nizi
 [*----------------------------------------------------------------------------*)
 
 let unija_nfa nfa1 nfa2 = 
-  let vsa_stanja = (NFA.seznam_stanj nfa1) @ (NFA.seznam_stanj nfa2) in
-  let veljavna_stanja = List.filter (NFA.je_sprejemno_stanje nfa1) (NFA.seznam_stanj nfa1) @ List.filter (NFA.je_sprejemno_stanje nfa2) (NFA.seznam_stanj nfa2) in
-  let neveljavna = List.filter (fun s -> not (List.mem s veljavna_stanja)) vsa_stanja in
-  let nepraz_prehodi =
-    List.filter_map
-      (fun (s, c_opt, n) ->
-        match c_opt with 
-        | Some c -> Some (s, c, n)
-        | None -> None
-      )
-      ((NFA.seznam_prehodov nfa1) @ (NFA.seznam_prehodov nfa2))
-  in
-  let praz_prehodi =
-    List.filter_map
-      (fun (s, c_opt, n) ->
-        match c_opt with 
-        | None -> Some (s, n) 
-        | Some _ -> None
-      )
-      ((NFA.seznam_prehodov nfa1) @ (NFA.seznam_prehodov nfa2))
-  in
+  let stanja1 = NFA.seznam_stanj nfa1 in
+  let stanja2 = NFA.seznam_stanj nfa2 in
+  let vsa_stanja = stanja1 @ stanja2 in
+
+  let veljavna1 = List.filter (fun s -> NFA.je_sprejemno_stanje nfa1 s) stanja1 in
+  let veljavna2 = List.filter (fun s -> NFA.je_sprejemno_stanje nfa2 s) stanja2 in
+  let vsa_veljavna = veljavna1 @ veljavna2 in
+
+  let prehodi = NFA.seznam_prehodov nfa1 @ NFA.seznam_prehodov nfa2 in
+
+  let nfa0 = NFA.ustvari "q_start" false in (*false ker ce true bi pomenilo da sprejema prazen niz, mene pa zanimajo sprejemna stanja of nfa1 in nfa2 ki ne nujno sprejmejo praznega niza*)
+  let nfa0 = List.fold_left (fun nfa s -> NFA.dodaj_stanje s (List.mem s vsa_veljavna) nfa) nfa0 vsa_stanja in
+  let nfa0 = List.fold_left (fun nfa (x,c_opt,y) ->
+         match c_opt with
+         | Some ch -> NFA.dodaj_prehod x ch y nfa
+         | None -> NFA.dodaj_prazen_prehod x y nfa)
+      nfa0 prehodi 
+    in
+  
+  let z1 = NFA.zacetno_stanje nfa1 in
+  let z2 = NFA.zacetno_stanje nfa2 in
+  let nfa0 = NFA.dodaj_prazen_prehod "q_start" z1 nfa0 in
+  let nfa0 = NFA.dodaj_prazen_prehod "q_start" z2 nfa0 in
+
+  nfa0
+
+let primer_regex_7 = List.filter (nfa_sprejema (unija_nfa epsilon_nfa (znak_nfa '0'))) nizi
 (* val primer_regex_7 : string list = [""; "0"] *)
 
 (*----------------------------------------------------------------------------*
@@ -686,8 +692,7 @@ let unija_nfa nfa1 nfa2 =
  argumentu, in drugega dela, ki ga sprejme avtomat v drugem argumentu.
 [*----------------------------------------------------------------------------*)
 
-let stik_nfa _ _ = ()
-
+let stik_nfa nfa1 nfa2 = ()
 let primer_regex_8 = List.filter (nfa_sprejema (stik_nfa (znak_nfa '0') (znak_nfa '1'))) nizi
 (* val primer_regex_8 : string list = ["01"] *)
 
